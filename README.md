@@ -286,7 +286,6 @@ Resultando em uma plataforma capaz de:
 Abaixo, os integrantes listados em **ordem alfabética**:
 
 - **Armando Bertolli** — armando.bertolli@gmail.com — RA **211192** - QA
-- **Caique Pinto** — fmendes767@gmail.com — RA **223007** - Dev
 - **Diego Juan Isaquiel Mizael** — diegoisaquiel1@gmail.com — RA **222545** - Scrum Master
 - **Gabriel Henrique Domingues de Oliveira** — gabrieloliveira2758@gmail.com - RA **222398** - QA
 - **Giovana Pontes Merguizo** — giovana.merguizo@outlook.com — RA **223397** - Dev
@@ -296,16 +295,3 @@ Abaixo, os integrantes listados em **ordem alfabética**:
 - **Leonardo Barbosa Gonçalves** — leonardo.goncalves16@outlook.com — RA **211923** - Dev
 - **Lucas Laureano Jorge da Silva** — lucaslaureanojorgesilva@hotmail.com —  RA **222679** - Tech Lead
 
----
-
-## Estrutura Esperada do Projeto
-
-```bash
-GenAcademy/
-├── data/
-├── notebooks/
-├── src/
-├── models/
-├── docs/
-├── README.md
-└── requirements.txt
