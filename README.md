@@ -264,6 +264,60 @@ O código e pipelines são versionados via GitHub.
 
 ---
 
+# ▶️ Como Rodar o Projeto
+Para executar a pipeline completa de dados e machine learning localmente, certifique-se de ter o Docker e o Docker Compose instalados.
+
+## 1. Preparação Inicial
+Baixe o dataset [nineteenFeaturesDf.csv](https://www.kaggle.com/datasets/nobukim/aws-cloudtrails-dataset-from-flaws-cloud?select=nineteenFeaturesDf.csv) e coloque-o na raiz do projeto.
+
+## 2. Subir a Infraestrutura Base
+Inicie os serviços do MinIO, PostgreSQL e MLflow:
+
+```bash
+docker compose up --build -d
+```
+
+_Aguarde alguns segundos para que o container `minio-setup` crie os buckets automaticamente._
+
+## 3. Executar o Pipeline de Dados (Medallion)
+Execute sequencialmente os scripts de dados por dentro do container do MLflow:
+
+**Ingestão na Camada Bronze:**
+
+```bash 
+docker exec -it mlflow-server python ingestion_bronze.py
+```
+
+**Processamento para a Camada Silver**
+```bash 
+docker exec -it mlflow-server python process_silver.py
+```
+
+**Processamento para a Camada Gold**
+
+```bash 
+docker exec -it mlflow-server python process_gold.py
+```
+## 4. Executar o Pipeline de Machine Learning
+Após os dados estarem consolidados na camada Gold, você pode treinar os modelos.
+
+**Treinamento dos Modelos:**
+```bash 
+docker exec -it mlflow-server python train_ml_pipeline.py
+```
+
+**Realizar Previsões com o Modelo Treinado:**
+
+```bash
+docker exec -it mlflow-server python predict_anomalies.py --model-path artifacts/isolatio
+n_forest/isolation_forest.pkl
+```
+## 5. Acessar os Dashboards Locais
+- **MinIO Console:** Acesse http://localhost:9001 (Usuário: minio / Senha: minio123)
+- **MLflow UI:** Acesse http://localhost:3000
+
+---
+
 # 🏁 Conclusão
 
 A arquitetura combina:
