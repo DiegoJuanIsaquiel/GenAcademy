@@ -14,7 +14,14 @@ RUN pip install --no-cache-dir \
     scikit-learn \
     joblib \
     numpy \
-    openpyxl
+    openpyxl \
+    python-dotenv \
+    pymilvus \
+    ollama \
+    sentence-transformers
+
+
+
 
 # Expõe a porta do painel
 EXPOSE 3000
