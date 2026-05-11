@@ -1,3 +1,4 @@
+import fnmatch
 import io
 import json
 import os
@@ -37,6 +38,7 @@ S3_ENDPOINT_URL = os.getenv("S3_ENDPOINT_URL", "http://minio:9000")
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "minio")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "minio123")
 BUCKET_NAME = os.getenv("BUCKET_NAME", "data-lake")
+FALLBACK_BUCKET_NAME = "data-lake"
 MLFLOW_CLIENT_TRACKING_URI = os.getenv("MLFLOW_CLIENT_TRACKING_URI", os.getenv("MLFLOW_TRACKING_SERVER_URI", "http://localhost:3000"))
 MLFLOW_EXPERIMENT_NAME = os.getenv("MLFLOW_EXPERIMENT_NAME", "cloudtrail-anomaly-detection")
 
@@ -59,19 +61,19 @@ def get_s3_client():
     )
 
 
-def list_objects(prefix: str) -> List[str]:
+def list_objects(prefix: str, bucket_name: str = BUCKET_NAME) -> List[str]:
     s3 = get_s3_client()
     paginator = s3.get_paginator("list_objects_v2")
     keys: List[str] = []
-    for page in paginator.paginate(Bucket=BUCKET_NAME, Prefix=prefix):
+    for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
         for obj in page.get("Contents", []):
             keys.append(obj["Key"])
     return keys
 
 
-def read_csv_or_parquet_from_s3(key: str) -> pd.DataFrame:
+def read_csv_or_parquet_from_s3(key: str, bucket_name: str = BUCKET_NAME) -> pd.DataFrame:
     s3 = get_s3_client()
-    response = s3.get_object(Bucket=BUCKET_NAME, Key=key)
+    response = s3.get_object(Bucket=bucket_name, Key=key)
     data = response["Body"].read()
     buffer = io.BytesIO(data)
     if key.lower().endswith(".parquet"):
@@ -97,14 +99,48 @@ def find_latest_local_file(domain: str, basename: str) -> Optional[Path]:
     return sorted(candidates)[-1]
 
 
-def find_latest_s3_key(domain: str, basename: str) -> Optional[str]:
-    keys = list_objects(f"gold/{domain}/")
-    filtered = [
-        k for k in keys if k.endswith(f"/{basename}.parquet") or k.endswith(f"/{basename}.csv")
-    ]
-    if not filtered:
-        return None
-    return sorted(filtered)[-1]
+def find_latest_s3_key(domain: str, basename: str) -> Optional[tuple[str, str]]:
+    prefix = f"gold/{domain}/"
+
+    for bucket_name in (BUCKET_NAME, FALLBACK_BUCKET_NAME):
+        if bucket_name == BUCKET_NAME:
+            print(f"Procurando em bucket padrão: {bucket_name}")
+        else:
+            print(f"Procurando em bucket fallback: {bucket_name}")
+
+        keys = list_objects(prefix, bucket_name=bucket_name)
+        filtered = [
+            k for k in keys
+            if fnmatch.fnmatch(k, f"*{domain}*/dt=*/{basename}.parquet")
+            or fnmatch.fnmatch(k, f"*{domain}*/dt=*/{basename}.csv")
+        ]
+        if filtered:
+            return sorted(filtered)[-1], bucket_name
+
+    # Se nada for encontrado sob o prefixo gold/{domain}/, tenta todo gold/ em ambos os buckets
+    for bucket_name in (BUCKET_NAME, FALLBACK_BUCKET_NAME):
+        keys = list_objects("gold/", bucket_name=bucket_name)
+        filtered = [
+            k for k in keys
+            if k.endswith(f"/{basename}.parquet") or k.endswith(f"/{basename}.csv")
+        ]
+        if filtered:
+            print(f"Encontrado em bucket {bucket_name} após varrer gold/ inteiro.")
+            return sorted(filtered)[-1], bucket_name
+
+    # Fallback final para vasculhar todo o bucket
+    for bucket_name in (BUCKET_NAME, FALLBACK_BUCKET_NAME):
+        keys = list_objects("", bucket_name=bucket_name)
+        filtered = [
+            k for k in keys
+            if k.endswith(f"/{basename}.parquet") or k.endswith(f"/{basename}.csv")
+        ]
+        if filtered:
+            print(f"Encontrado em bucket {bucket_name} após varrer todo o bucket.")
+            return sorted(filtered)[-1], bucket_name
+
+    print("Nenhum arquivo encontrado em nenhum bucket. Verifique se process_gold.py gravou em data-lake e se BUCKET_NAME está correto.")
+    return None
 
 
 def load_domain_dataset(domain: str, basename: str) -> pd.DataFrame:
@@ -113,13 +149,17 @@ def load_domain_dataset(domain: str, basename: str) -> pd.DataFrame:
         print(f"Lendo localmente: {local_candidate}")
         return read_csv_or_parquet_local(local_candidate)
 
+    print(f"Não foi encontrado arquivo local em {LOCAL_GOLD_BASE}/{domain}/dt=*/{basename}.(parquet|csv)")
     s3_candidate = find_latest_s3_key(domain, basename)
     if s3_candidate:
-        print(f"Lendo do MinIO: s3://{BUCKET_NAME}/{s3_candidate}")
-        return read_csv_or_parquet_from_s3(s3_candidate)
+        key, bucket_name = s3_candidate
+        print(f"Lendo do MinIO: s3://{bucket_name}/{key}")
+        return read_csv_or_parquet_from_s3(key, bucket_name=bucket_name)
 
+    print(f"Nenhuma chave encontrada no MinIO para o prefixo gold/{domain}/")
     raise FileNotFoundError(
-        f"Dataset não encontrado para domain={domain}, basename={basename}."
+        f"Dataset não encontrado para domain={domain}, basename={basename}. "
+        "Verifique se process_gold.py já foi executado e se os arquivos existem em MinIO ou no caminho local."
     )
 
 

@@ -168,7 +168,7 @@ O Agent utiliza ferramentas (tools):
 
 # 🔍 Vector Database (RAG)
 
-Responsável por armazenar embeddings e permitir:
+Responsável por armazenar documentos de conhecimento e permitir:
 
 * busca semântica
 * recuperação de contexto
@@ -179,6 +179,32 @@ Responsável por armazenar embeddings e permitir:
 ```text
 Gold → Pipeline de Embeddings → VectorDB
 ```
+
+## Implementação disponível
+
+O projeto agora inclui um módulo de RAG:
+
+* `rag_core.py` — implementa o fluxo de recuperação do contexto a partir de documentos Gold existentes
+* `list` — lista documentos disponíveis em `gold/` local e/ou em MinIO
+* `query` — recupera os trechos mais relevantes e monta o prompt
+* `--llm` — opcionalmente envia o contexto para OpenAI e recebe resposta final
+
+### Exemplo de uso
+
+```bash
+python rag_core.py list --source local --local-base gold
+python rag_core.py query "Quais são os maiores riscos de segurança?" --source local --local-base gold --top-k 5
+OPENAI_API_KEY=... python rag_core.py query "O que diz a documentação do gold security?" --source local --local-base gold --llm
+```
+
+### Consulta Milvus + LLM
+
+```bash
+python rag_milvus_query.py "Quais alertas de segurança são mais críticos?" --top-k 5
+python rag_milvus_query.py "Explique o maior risco de segurança identificado." --top-k 5 --llm
+```
+
+> Se você quiser usar o Agent completo em produção, esse módulo é o núcleo RAG que entrega o contexto semântico ao modelo.
 
 ---
 
@@ -298,6 +324,14 @@ docker exec -it mlflow-server python process_silver.py
 ```bash 
 docker exec -it mlflow-server python process_gold.py
 ```
+
+> Se você alterar dependências Python ou instalar pacotes novos, reconstrua a imagem antes de rodar.
+>
+> ```bash
+docker compose build mlflow
+docker compose up -d
+```
+
 ## 4. Executar o Pipeline de Machine Learning
 Após os dados estarem consolidados na camada Gold, você pode treinar os modelos.
 

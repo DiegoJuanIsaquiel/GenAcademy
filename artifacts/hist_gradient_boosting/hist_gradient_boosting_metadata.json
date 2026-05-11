@@ -1,0 +1,30 @@
+{
+  "model_name": "hist_gradient_boosting",
+  "feature_columns": [
+    "total_cost",
+    "total_requests_cost",
+    "requests_service_ec2",
+    "requests_service_iam",
+    "requests_service_other_services",
+    "requests_service_s3",
+    "cost_service_ec2",
+    "cost_service_iam",
+    "cost_service_other_services",
+    "cost_service_s3",
+    "total_requests_perf",
+    "total_unique_users",
+    "total_requests_security",
+    "year",
+    "month",
+    "day",
+    "hour",
+    "day_of_week",
+    "is_weekend",
+    "hour_sin",
+    "hour_cos",
+    "avg_cost_per_request",
+    "security_to_perf_ratio"
+  ],
+  "target": "is_anomaly",
+  "problem_type": "binary_classification_with_weak_labels"
+}
