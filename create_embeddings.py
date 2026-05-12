@@ -1,8 +1,9 @@
 import io
+import os
 import pandas as pd
 import boto3
-import ollama
 from ollama import Client
+from ollama import ResponseError
 from pymilvus import connections, FieldSchema, CollectionSchema, DataType, Collection, utility
 
 # ── Configurações ────────────────────────────────────────────
@@ -16,7 +17,10 @@ MILVUS_PORT = "19530"
 COLLECTION_NAME = "GenAcademy_Gold_Data"
 EMBEDDING_DIM = 768
 
-ollama_client = Client(host='http://ollama:11434')
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://ollama:11434")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
+
+ollama_client = Client(host=OLLAMA_HOST)
 
 # ── Cliente MinIO ────────────────────────────────────────────
 s3_client = boto3.client(
@@ -79,8 +83,58 @@ def setup_milvus():
     collection.create_index(field_name="embedding", index_params=index_params)
     return collection
 
+def _model_names(model_list_response):
+    """Extrai nomes de modelos lidando com formatos diferentes da API Ollama."""
+    models = []
+    if isinstance(model_list_response, dict):
+        models = model_list_response.get("models", [])
+    else:
+        models = getattr(model_list_response, "models", [])
+
+    names = set()
+    for model in models:
+        if isinstance(model, dict):
+            name = model.get("name") or model.get("model")
+        else:
+            name = getattr(model, "name", None) or getattr(model, "model", None)
+        if name:
+            names.add(name)
+            names.add(name.split(":")[0])
+    return names
+
+def ensure_embedding_model():
+    """Garante que o modelo de embeddings existe no Ollama antes do loop caro."""
+    try:
+        available_models = _model_names(ollama_client.list())
+    except Exception as exc:
+        raise RuntimeError(
+            f"Nao foi possivel conectar ao Ollama em {OLLAMA_HOST}. "
+            "Verifique se o servico/container 'ollama' esta rodando."
+        ) from exc
+
+    if EMBEDDING_MODEL in available_models or EMBEDDING_MODEL.split(":")[0] in available_models:
+        return
+
+    print(f"Modelo Ollama '{EMBEDDING_MODEL}' nao encontrado. Baixando agora...")
+    try:
+        ollama_client.pull(EMBEDDING_MODEL)
+    except ResponseError as exc:
+        raise RuntimeError(
+            f"Nao foi possivel baixar o modelo '{EMBEDDING_MODEL}' no Ollama. "
+            f"Execute manualmente: docker exec -it ollama ollama pull {EMBEDDING_MODEL}"
+        ) from exc
+
+def extract_embedding(response):
+    if isinstance(response, dict) and "embedding" in response:
+        return response["embedding"]
+    embedding = getattr(response, "embedding", None)
+    if embedding:
+        return embedding
+    raise RuntimeError("Nao foi possivel obter embedding do Ollama.")
+
 def main():
     print("Iniciando Pipeline de Embeddings (Sprint 5)...")
+    ensure_embedding_model()
     collection = setup_milvus()
     
     domains = ["cost", "performance", "security"]
@@ -104,8 +158,8 @@ def main():
             texto = textify_row(row, domain)
             
             # Chama o Ollama apontando para o container
-            response = ollama_client.embeddings(model="nomic-embed-text", prompt=texto)
-            vetor = response["embedding"]
+            response = ollama_client.embeddings(model=EMBEDDING_MODEL, prompt=texto)
+            vetor = extract_embedding(response)
             
             insert_data[0].append(domain)
             insert_data[1].append(texto)

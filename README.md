@@ -199,10 +199,79 @@ OPENAI_API_KEY=... python rag_core.py query "O que diz a documentação do gold 
 
 ### Consulta Milvus + LLM
 
+Antes da primeira consulta, crie a colecao vetorial a partir dos arquivos Gold. O modelo de embedding
+`nomic-embed-text` e baixado automaticamente pelo `docker compose` via servico `ollama-pull`; se precisar
+forcar manualmente, execute `docker exec -it ollama ollama pull nomic-embed-text`.
+
+```bash
+docker exec -it mlflow-server python create_embeddings.py
+```
+
 ```bash
 python rag_milvus_query.py "Quais alertas de segurança são mais críticos?" --top-k 5
 python rag_milvus_query.py "Explique o maior risco de segurança identificado." --top-k 5 --llm
 ```
+
+### Passo a passo para interagir com a LLM
+
+1. Suba os containers do projeto.
+
+```bash
+docker compose up --build -d
+```
+
+2. Confirme que o Ollama esta rodando e que o modelo de embedding existe.
+
+```bash
+docker exec -it ollama ollama list
+```
+
+O modelo `nomic-embed-text` deve aparecer na lista. Se nao aparecer, baixe manualmente:
+
+```bash
+docker exec -it ollama ollama pull nomic-embed-text
+```
+
+3. Gere os dados Gold, caso ainda nao tenha feito isso.
+
+```bash
+docker exec -it mlflow-server python ingestion_bronze.py
+docker exec -it mlflow-server python process_silver.py
+docker exec -it mlflow-server python process_gold.py
+```
+
+4. Crie a base vetorial no Milvus.
+
+```bash
+docker exec -it mlflow-server python create_embeddings.py
+```
+
+Esse passo transforma os registros Gold em textos, gera embeddings com Ollama e salva os vetores na colecao `GenAcademy_Gold_Data` do Milvus.
+
+5. Teste primeiro a recuperacao de contexto, sem chamar a LLM.
+
+```bash
+docker exec -it mlflow-server python rag_milvus_query.py "Quais alertas de seguranca sao mais criticos?" --top-k 5
+```
+
+Esse comando mostra os documentos mais parecidos encontrados no Milvus e o prompt que seria enviado para a LLM.
+
+6. Faca a pergunta usando a LLM.
+
+```bash
+docker exec -it mlflow-server python rag_milvus_query.py "Explique o maior risco de seguranca identificado." --top-k 5 --llm
+```
+
+Com `--llm`, o script recupera contexto no Milvus, monta um prompt e envia para o modelo configurado em `LLM_MODEL`.
+
+7. Opcionalmente, escolha outro modelo de LLM.
+
+```bash
+docker exec -it ollama ollama pull llama2
+docker exec -it mlflow-server sh -c "LLM_MODEL=llama2 python rag_milvus_query.py 'Resuma os riscos de seguranca encontrados.' --top-k 5 --llm"
+```
+
+Por padrao, o projeto usa `nomic-embed-text` para embeddings e `llama2` para respostas em linguagem natural.
 
 > Se você quiser usar o Agent completo em produção, esse módulo é o núcleo RAG que entrega o contexto semântico ao modelo.
 
