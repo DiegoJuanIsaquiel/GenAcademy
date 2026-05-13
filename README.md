@@ -197,42 +197,31 @@ python rag_core.py query "Quais são os maiores riscos de segurança?" --source 
 OPENAI_API_KEY=... python rag_core.py query "O que diz a documentação do gold security?" --source local --local-base gold --llm
 ```
 
-### Consulta Milvus + LLM
+### Consulta com RAG + Milvus + LLM
 
-Antes da primeira consulta, crie a colecao vetorial a partir dos arquivos Gold. O modelo de embedding
-`nomic-embed-text` e baixado automaticamente pelo `docker compose` via servico `ollama-pull`; se precisar
-forcar manualmente, execute `docker exec -it ollama ollama pull nomic-embed-text`.
+O script `rag_milvus_query.py` permite fazer perguntas em linguagem natural que são respondidas com base no contexto recuperado da base vetorial (Milvus) usando o modelo de embedding `nomic-embed-text` e respondidas pelo LLM local `llama2`.
 
-```bash
-docker exec -it mlflow-server python create_embeddings.py
-```
+#### Passo a passo para interagir com a LLM
 
-```bash
-python rag_milvus_query.py "Quais alertas de segurança são mais críticos?" --top-k 5
-python rag_milvus_query.py "Explique o maior risco de segurança identificado." --top-k 5 --llm
-```
-
-### Passo a passo para interagir com a LLM
-
-1. Suba os containers do projeto.
+**1. Suba os containers do projeto.**
 
 ```bash
 docker compose up --build -d
 ```
 
-2. Confirme que o Ollama esta rodando e que o modelo de embedding existe.
+**2. Confirme que o Ollama está rodando e que o modelo de embedding existe.**
 
 ```bash
 docker exec -it ollama ollama list
 ```
 
-O modelo `nomic-embed-text` deve aparecer na lista. Se nao aparecer, baixe manualmente:
+O modelo `nomic-embed-text` deve aparecer na lista. Se não aparecer, baixe manualmente:
 
 ```bash
 docker exec -it ollama ollama pull nomic-embed-text
 ```
 
-3. Gere os dados Gold, caso ainda nao tenha feito isso.
+**3. Gere os dados Gold, caso ainda não tenha feito isso.**
 
 ```bash
 docker exec -it mlflow-server python ingestion_bronze.py
@@ -240,38 +229,75 @@ docker exec -it mlflow-server python process_silver.py
 docker exec -it mlflow-server python process_gold.py
 ```
 
-4. Crie a base vetorial no Milvus.
+**4. Crie a base vetorial no Milvus.**
 
 ```bash
 docker exec -it mlflow-server python create_embeddings.py
 ```
 
-Esse passo transforma os registros Gold em textos, gera embeddings com Ollama e salva os vetores na colecao `GenAcademy_Gold_Data` do Milvus.
+Esse passo transforma os registros Gold em textos, gera embeddings com Ollama e salva os vetores na coleção `GenAcademy_Gold_Data` do Milvus.
 
-5. Teste primeiro a recuperacao de contexto, sem chamar a LLM.
+**5. Teste primeiro a recuperação de contexto, sem chamar a LLM.**
 
 ```bash
-docker exec -it mlflow-server python rag_milvus_query.py "Quais alertas de seguranca sao mais criticos?" --top-k 5
+docker exec -it mlflow-server python rag_milvus_query.py "Quais alertas de segurança são mais críticos?" --top-k 5
 ```
 
 Esse comando mostra os documentos mais parecidos encontrados no Milvus e o prompt que seria enviado para a LLM.
 
-6. Faca a pergunta usando a LLM.
+**6. Faça a pergunta usando a LLM.**
 
 ```bash
-docker exec -it mlflow-server python rag_milvus_query.py "Explique o maior risco de seguranca identificado." --top-k 5 --llm
+docker exec -it mlflow-server python rag_milvus_query.py "Explique o maior risco de segurança identificado." --top-k 5 --llm
 ```
 
 Com `--llm`, o script recupera contexto no Milvus, monta um prompt e envia para o modelo configurado em `LLM_MODEL`.
 
-7. Opcionalmente, escolha outro modelo de LLM.
+#### Exemplos de Consultas
+
+Aqui estão alguns exemplos de perguntas que você pode fazer:
+
+**Com recuperação de contexto apenas (sem LLM):**
+```bash
+docker exec -it mlflow-server python rag_milvus_query.py "Quais foram as últimas anomalias captadas e os motivos"
+```
+
+**Com resposta da LLM:**
+```bash
+docker exec -it mlflow-server python rag_milvus_query.py "Quais foram as últimas anomalias captadas e os motivos" --llm
+```
+
+**Com mais documentos para contexto:**
+```bash
+docker exec -it mlflow-server python rag_milvus_query.py "Quais foram as últimas anomalias captadas e os motivos" --top-k 10 --llm
+```
+
+**Outras perguntas de exemplo:**
+```bash
+docker exec -it mlflow-server python rag_milvus_query.py "Quais alertas de segurança são mais críticos?" --llm
+docker exec -it mlflow-server python rag_milvus_query.py "Resuma os riscos de segurança encontrados." --llm
+docker exec -it mlflow-server python rag_milvus_query.py "Qual foi o padrão de acesso mais incomum?" --llm
+docker exec -it mlflow-server python rag_milvus_query.py "Quais usuários têm acessos fora do horário normal?" --llm
+```
+
+**7. Opcionalmente, escolha outro modelo de LLM.**
 
 ```bash
 docker exec -it ollama ollama pull llama2
-docker exec -it mlflow-server sh -c "LLM_MODEL=llama2 python rag_milvus_query.py 'Resuma os riscos de seguranca encontrados.' --top-k 5 --llm"
+docker exec -it mlflow-server sh -c "LLM_MODEL=llama2 python rag_milvus_query.py 'Resuma os riscos de segurança encontrados.' --top-k 5 --llm"
 ```
 
-Por padrao, o projeto usa `nomic-embed-text` para embeddings e `llama2` para respostas em linguagem natural.
+Por padrão, o projeto usa `nomic-embed-text` para embeddings e `llama2` para respostas em linguagem natural.
+
+#### Argumentos do Script
+
+```bash
+docker exec -it mlflow-server python rag_milvus_query.py <pergunta> [opções]
+```
+
+- `<pergunta>` (obrigatório): A pergunta em linguagem natural
+- `--top-k N` (opcional): Número de documentos a recuperar do Milvus (padrão: 5)
+- `--llm` (opcional): Flag para usar o LLM na resposta (sem ela, apenas recupera contexto)
 
 > Se você quiser usar o Agent completo em produção, esse módulo é o núcleo RAG que entrega o contexto semântico ao modelo.
 
