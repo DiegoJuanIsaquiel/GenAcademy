@@ -3,7 +3,7 @@ FROM python:3.9-slim
 # Define a pasta de trabalho
 WORKDIR /app
 
-RUN pip install --no-cache-dir \
+RUN pip install --default-timeout=1000 --no-cache-dir \
     mlflow \
     boto3 \
     psycopg2-binary \
@@ -20,7 +20,7 @@ RUN pip install --no-cache-dir \
     ollama \
     sentence-transformers \
     fastapi \
-    uvicorn\
+    uvicorn \
     pydantic
 
 # Expõe a porta do painel
