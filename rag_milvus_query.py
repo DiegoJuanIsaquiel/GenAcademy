@@ -133,35 +133,24 @@ def search_milvus(query_vector: List[float], top_k: int = 5) -> List[Dict[str, A
         )
     return hits
 
-
 def build_context(question: str, hits: List[Dict[str, Any]]) -> str:
     lines = [
         "Use as informações abaixo para responder à pergunta de forma objetiva e precisa.",
         "Não invente respostas além do contexto retornado.",
-        "Quando não souber a resposta, diga que não sabe. Não tente adivinhar ou criar informações.",
-        "Sempre consulte a nossa base de conhecimento para responder, mesmo que a resposta pareça óbvia. A base de conhecimento é a fonte mais confiável de informações.",
+        "Quando não souber a resposta, diga que não sabe.",
+        "\nContexto disponivel:",
     ]
-    for idx, hit in enumerate(hits, start=1):
-        lines.append(f"Fonte {idx}: domínio={hit.get('domain')} | score={hit.get('score'):.4f}")
-        lines.append(hit.get("text", ""))
-        lines.append("")
-    lines.append("Pergunta:")
-    lines.append(question)
-    return "\n".join(lines)
-
-
-def build_context(question: str, hits: List[Dict[str, Any]]) -> str:
-    lines = ["Contexto disponivel:", ""]
+    
     for idx, hit in enumerate(hits, start=1):
         lines.append(f"Registro {idx}: dominio={hit.get('domain')}")
         lines.append(normalize_context_text(hit.get("text", "")))
         lines.append("")
+        
     lines.append("Pergunta:")
     lines.append(question)
-    lines.append("")
-    lines.append("Resposta final:")
+    lines.append("\nResposta final:")
+    
     return "\n".join(lines)
-
 
 def normalize_context_text(text: str) -> str:
     replacements = {
