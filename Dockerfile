@@ -18,10 +18,10 @@ RUN pip install --no-cache-dir \
     python-dotenv \
     pymilvus \
     ollama \
-    sentence-transformers
-
-
-
+    sentence-transformers \
+    fastapi \
+    uvicorn\
+    pydantic
 
 # Expõe a porta do painel
 EXPOSE 3000
