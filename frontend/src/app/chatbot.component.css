@@ -1,0 +1,228 @@
+.chat-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.chat-panel {
+  width: min(100%, 28rem);
+  min-height: calc(100vh - 2rem);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 1.5rem;
+  background:
+    linear-gradient(180deg, rgba(10, 16, 33, 0.96) 0%, rgba(8, 12, 25, 0.98) 100%);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+}
+
+.chat-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.35rem;
+  color: var(--primary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.chat-header h1 {
+  margin: 0;
+  font-size: 1.45rem;
+  line-height: 1.1;
+}
+
+.description {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.status-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: #ffd166;
+  box-shadow: 0 0 0.6rem rgba(255, 209, 102, 0.8);
+}
+
+.status-chip[data-state='ready'] .status-dot {
+  background: #62ffa3;
+  box-shadow: 0 0 0.7rem rgba(98, 255, 163, 0.8);
+}
+
+.status-chip[data-state='offline'] .status-dot {
+  background: var(--danger);
+  box-shadow: 0 0 0.7rem rgba(255, 125, 156, 0.8);
+}
+
+.messages {
+  min-height: 16rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow: auto;
+  padding-right: 0.2rem;
+}
+
+.messages::-webkit-scrollbar {
+  width: 0.35rem;
+}
+
+.messages::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+}
+
+.message {
+  display: flex;
+}
+
+.message[data-role='user'] {
+  justify-content: flex-end;
+}
+
+.bubble {
+  max-width: 85%;
+  padding: 0.85rem 1rem;
+  border-radius: 1.1rem;
+  border: 1px solid transparent;
+  background: var(--surface-soft);
+}
+
+.bubble p {
+  margin: 0;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.message[data-role='user'] .bubble {
+  background: linear-gradient(135deg, rgba(63, 150, 255, 0.28), rgba(51, 182, 216, 0.35));
+  border-color: rgba(110, 231, 255, 0.18);
+}
+
+.message[data-status='sending'] .bubble {
+  border-color: rgba(255, 209, 102, 0.38);
+}
+
+.message[data-status='error'] .bubble {
+  border-color: rgba(255, 125, 156, 0.45);
+  background: rgba(109, 25, 47, 0.52);
+}
+
+.empty-state {
+  margin: auto 0;
+  padding: 1.15rem;
+  border-radius: 1.2rem;
+  border: 1px dashed var(--border-strong);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.empty-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.empty-copy {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.empty-copy code {
+  color: var(--primary);
+}
+
+.composer {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.composer-label {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.composer-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.65rem;
+}
+
+.composer input {
+  min-width: 0;
+  padding: 0.95rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.composer input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 0.2rem rgba(110, 231, 255, 0.15);
+}
+
+.composer input:disabled {
+  opacity: 0.72;
+}
+
+.composer button {
+  padding: 0.95rem 1.1rem;
+  border: 0;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, var(--primary), var(--primary-strong));
+  color: #04111c;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+
+.composer button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.composer button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (min-width: 768px) {
+  .chat-shell {
+    padding: 2rem;
+  }
+
+  .chat-panel {
+    width: min(100%, 32rem);
+    min-height: min(88vh, 52rem);
+    padding: 1.35rem;
+  }
+}

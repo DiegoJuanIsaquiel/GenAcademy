@@ -1,0 +1,66 @@
+<main class="chat-shell">
+  <section class="chat-panel" aria-label="Chatbot GenAcademy">
+    <header class="chat-header">
+      <div>
+        <p class="eyebrow">GenAcademy</p>
+        <h1>{{ assistantName }}</h1>
+        <p class="description">{{ assistantDescription }}</p>
+      </div>
+
+      <div class="status-chip" [attr.data-state]="metadataState">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span>
+          @if (metadataState === 'loading') {
+            Conectando
+          } @else if (metadataState === 'ready') {
+            Online
+          } @else {
+            Servico indisponivel
+          }
+        </span>
+      </div>
+    </header>
+
+    <section class="messages" aria-live="polite">
+      @if (hasMessages) {
+        @for (message of messages; track trackByMessageId($index, message)) {
+          <article class="message" [attr.data-role]="message.role" [attr.data-status]="message.status">
+            <div class="bubble">
+              <p>{{ message.content }}</p>
+            </div>
+          </article>
+        }
+      } @else {
+        <article class="empty-state">
+          <p class="empty-title">Seu chat com a API comeca aqui.</p>
+          <p class="empty-copy">
+            Envie uma pergunta para testar a integracao com <code>/query</code>.
+            O frontend permanece utilizavel mesmo se a API ainda nao estiver no ar.
+          </p>
+        </article>
+      }
+    </section>
+
+    <form class="composer" (ngSubmit)="sendMessage()">
+      <label class="composer-label" for="chat-question">Pergunta</label>
+      <div class="composer-row">
+        <input
+          id="chat-question"
+          name="question"
+          type="text"
+          [(ngModel)]="draft"
+          [disabled]="isSubmitting"
+          placeholder="Pergunte sobre anomalias, riscos ou contexto..."
+          autocomplete="off"
+        >
+        <button type="submit" [disabled]="!canSend">
+          @if (isSubmitting) {
+            Enviando
+          } @else {
+            Perguntar
+          }
+        </button>
+      </div>
+    </form>
+  </section>
+</main>
