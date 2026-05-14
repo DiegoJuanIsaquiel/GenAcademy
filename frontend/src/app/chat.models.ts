@@ -4,30 +4,31 @@ export interface ChatMessage {
   content: string;
   createdAt: string;
   status?: 'sending' | 'sent' | 'error';
+  question?: string;
+  sources?: SourceMetadata[];
 }
 
 export interface QueryRequest {
   question: string;
+  top_k?: number;
 }
 
-export interface QuerySource {
-  title?: string;
-  snippet?: string;
-  url?: string;
+export interface SourceMetadata {
+  id: number;
+  domain: string;
+  score: number;
+  text: string;
 }
 
 export interface QueryResponse {
+  question: string;
   answer: string;
-  sessionId?: string;
-  sources?: QuerySource[];
-  metadata?: Record<string, unknown>;
-  latencyMs?: number;
-  timestamp?: string;
+  sources: SourceMetadata[];
 }
 
 export interface ChatMetadataResponse {
-  name: string;
-  description: string;
-  version?: string;
-  status?: string;
+  embedding_model: string;
+  llm_model: string;
+  vector_db: string;
+  status: string;
 }

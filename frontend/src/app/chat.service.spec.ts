@@ -34,13 +34,17 @@ describe('ChatService', () => {
     expect(request.request.method).toBe('GET');
 
     request.flush({
-      name: 'GenAcademy AI',
-      description: 'Assistente do projeto'
+      embedding_model: 'nomic-embed-text',
+      llm_model: 'llama2',
+      vector_db: 'Milvus (standalone)',
+      status: 'ready'
     });
 
     expect(responseBody).toEqual({
-      name: 'GenAcademy AI',
-      description: 'Assistente do projeto'
+      embedding_model: 'nomic-embed-text',
+      llm_model: 'llama2',
+      vector_db: 'Milvus (standalone)',
+      status: 'ready'
     });
   });
 
@@ -58,11 +62,29 @@ describe('ChatService', () => {
     });
 
     request.flush({
-      answer: 'O risco atual esta controlado.'
+      question: 'Qual e o risco atual?',
+      answer: 'O risco atual esta controlado.',
+      sources: [
+        {
+          id: 1,
+          domain: 'security',
+          score: 0.984,
+          text: 'Trecho relevante'
+        }
+      ]
     });
 
     expect(responseBody).toEqual({
-      answer: 'O risco atual esta controlado.'
+      question: 'Qual e o risco atual?',
+      answer: 'O risco atual esta controlado.',
+      sources: [
+        {
+          id: 1,
+          domain: 'security',
+          score: 0.984,
+          text: 'Trecho relevante'
+        }
+      ]
     });
   });
 

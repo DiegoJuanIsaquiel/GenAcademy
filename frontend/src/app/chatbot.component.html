@@ -5,6 +5,7 @@
         <p class="eyebrow">GenAcademy</p>
         <h1>{{ assistantName }}</h1>
         <p class="description">{{ assistantDescription }}</p>
+        <p class="details">{{ assistantDetails }}</p>
       </div>
 
       <div class="status-chip" [attr.data-state]="metadataState">
@@ -27,6 +28,22 @@
           <article class="message" [attr.data-role]="message.role" [attr.data-status]="message.status">
             <div class="bubble">
               <p>{{ message.content }}</p>
+
+              @if (message.sources?.length) {
+                <section class="sources" aria-label="Fontes recuperadas">
+                  <p class="sources-title">Fontes recuperadas</p>
+
+                  @for (source of message.sources; track source.id) {
+                    <article class="source-card">
+                      <div class="source-meta">
+                        <span>{{ source.domain }}</span>
+                        <span>score {{ source.score.toFixed(3) }}</span>
+                      </div>
+                      <p>{{ source.text }}</p>
+                    </article>
+                  }
+                </section>
+              }
             </div>
           </article>
         }

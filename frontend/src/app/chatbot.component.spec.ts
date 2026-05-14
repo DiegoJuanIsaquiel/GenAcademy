@@ -10,11 +10,22 @@ describe('ChatbotComponent', () => {
   beforeEach(async () => {
     chatServiceSpy = jasmine.createSpyObj<ChatService>('ChatService', ['getMetadata', 'sendQuery']);
     chatServiceSpy.getMetadata.and.returnValue(of({
-      name: 'GenAcademy AI',
-      description: 'Assistente online'
+      embedding_model: 'nomic-embed-text',
+      llm_model: 'llama2',
+      vector_db: 'Milvus (standalone)',
+      status: 'ready'
     }));
     chatServiceSpy.sendQuery.and.returnValue(of({
-      answer: 'Resposta da API'
+      question: 'Como esta a plataforma?',
+      answer: 'Resposta da API',
+      sources: [
+        {
+          id: 1,
+          domain: 'security',
+          score: 0.991,
+          text: 'Contexto recuperado do Milvus'
+        }
+      ]
     }));
 
     await TestBed.configureTestingModule({
@@ -44,7 +55,8 @@ describe('ChatbotComponent', () => {
     const root = fixture.nativeElement as HTMLElement;
     expect(chatServiceSpy.getMetadata).toHaveBeenCalled();
     expect(root.querySelector('h1')?.textContent).toContain('GenAcademy AI');
-    expect(root.querySelector('.description')?.textContent).toContain('Assistente online');
+    expect(root.querySelector('.description')?.textContent).toContain('LLM llama2 com embeddings nomic-embed-text.');
+    expect(root.querySelector('.details')?.textContent).toContain('Base vetorial: Milvus (standalone).');
   });
 
   it('deve enviar pergunta e incluir a resposta no chat', () => {
@@ -64,10 +76,15 @@ describe('ChatbotComponent', () => {
     expect(messages.length).toBe(2);
     expect(messages[0].textContent).toContain('Como esta a plataforma?');
     expect(messages[1].textContent).toContain('Resposta da API');
+    expect(messages[1].textContent).toContain('security');
+    expect(messages[1].textContent).toContain('Contexto recuperado do Milvus');
   });
 
   it('deve exibir mensagem amigavel quando a API falhar', async () => {
-    chatServiceSpy.sendQuery.and.returnValue(throwError(() => new Error('falhou')));
+    chatServiceSpy.sendQuery.and.returnValue(throwError(() => ({
+      status: 404,
+      error: { detail: 'Nenhum contexto encontrado para esta pergunta.' }
+    })));
 
     const fixture = TestBed.createComponent(ChatbotComponent);
     fixture.detectChanges();
@@ -81,8 +98,7 @@ describe('ChatbotComponent', () => {
     fixture.detectChanges();
 
     const root = fixture.nativeElement as HTMLElement;
-    expect(root.textContent).toContain('Nao foi possivel falar com a API agora.');
-    expect(root.querySelector('.status-chip')?.textContent).toContain('Servico indisponivel');
+    expect(root.textContent).toContain('Nenhum contexto encontrado para esta pergunta.');
   });
 
   it('deve bloquear envio com input vazio', () => {

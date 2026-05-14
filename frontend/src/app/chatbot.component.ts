@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
@@ -20,6 +21,7 @@ export class ChatbotComponent implements OnInit {
   metadataState: 'loading' | 'ready' | 'offline' = 'loading';
   assistantName = 'GenAcademy AI';
   assistantDescription = 'Conectando ao servico de assistencia...';
+  assistantDetails = '';
   messages: ChatMessage[] = [];
 
   ngOnInit(): void {
@@ -56,13 +58,14 @@ export class ChatbotComponent implements OnInit {
         next: (response) => {
           this.replaceMessage(pendingAssistantMessage.id, {
             content: response.answer?.trim() || 'A API respondeu sem conteudo util.',
+            question: response.question,
+            sources: response.sources,
             status: 'sent'
           });
         },
-        error: () => {
-          this.metadataState = 'offline';
+        error: (error: HttpErrorResponse) => {
           this.replaceMessage(pendingAssistantMessage.id, {
-            content: 'Nao foi possivel falar com a API agora. Tente novamente em instantes.',
+            content: this.buildErrorMessage(error),
             status: 'error'
           });
         }
@@ -77,18 +80,19 @@ export class ChatbotComponent implements OnInit {
     this.chatService.getMetadata().subscribe({
       next: (metadata) => {
         this.applyMetadata(metadata);
-        this.metadataState = 'ready';
+        this.metadataState = metadata.status === 'ready' ? 'ready' : 'offline';
       },
       error: () => {
         this.metadataState = 'offline';
         this.assistantDescription = 'Servico de metadata indisponivel. O chat continua pronto para tentar chamadas HTTP.';
+        this.assistantDetails = 'Sem detalhes operacionais da API no momento.';
       }
     });
   }
 
   private applyMetadata(metadata: ChatMetadataResponse): void {
-    this.assistantName = metadata.name?.trim() || this.assistantName;
-    this.assistantDescription = metadata.description?.trim() || 'Assistente pronto para receber perguntas.';
+    this.assistantDescription = `LLM ${metadata.llm_model} com embeddings ${metadata.embedding_model}.`;
+    this.assistantDetails = `Base vetorial: ${metadata.vector_db}. Status da API: ${metadata.status}.`;
   }
 
   private createMessage(
@@ -111,6 +115,20 @@ export class ChatbotComponent implements OnInit {
         ? { ...message, ...patch }
         : message
     ));
+  }
+
+  private buildErrorMessage(error: HttpErrorResponse): string {
+    const apiMessage = typeof error.error?.detail === 'string' ? error.error.detail.trim() : '';
+
+    if (apiMessage) {
+      return apiMessage;
+    }
+
+    if (error.status === 404) {
+      return 'Nenhum contexto encontrado para esta pergunta.';
+    }
+
+    return 'Nao foi possivel falar com a API agora. Tente novamente em instantes.';
   }
 
   private generateId(): string {

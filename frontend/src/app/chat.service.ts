@@ -15,8 +15,11 @@ export class ChatService {
     return this.http.get<ChatMetadataResponse>(`${this.apiBaseUrl}/metadata`);
   }
 
-  sendQuery(question: string): Observable<QueryResponse> {
-    const payload: QueryRequest = { question };
+  sendQuery(question: string, topK?: number): Observable<QueryResponse> {
+    const payload: QueryRequest = topK === undefined
+      ? { question }
+      : { question, top_k: topK };
+
     return this.http.post<QueryResponse>(`${this.apiBaseUrl}/query`, payload);
   }
 }
