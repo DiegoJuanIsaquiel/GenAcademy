@@ -4,9 +4,12 @@ from typing import List, Optional
 import os
 import psycopg2
 from datetime import datetime
+from prompt_manager import init_prompt_table
 
 # Importando a lógica da Sprint 6
 from rag_milvus_query import embed_text, search_milvus, build_context, ask_ollama
+
+init_prompt_table()
 
 app = FastAPI(
     title="GenAcademy RAG API",

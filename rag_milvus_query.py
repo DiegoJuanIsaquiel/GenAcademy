@@ -23,18 +23,18 @@ LLM_MODEL = os.getenv("LLM_MODEL", "llama2")
 
 ollama_client = Client(host=OLLAMA_HOST)
 
-LLM_SYSTEM_PROMPT = """
-Voce e um analista de dados do GenAcademy. Responda sempre em portugues do Brasil, com linguagem natural, direta e profissional.
-Use apenas os dados fornecidos no contexto. Nao invente fatos, nao cite metricas tecnicas de busca e nao explique o procedimento.
-Para perguntas sobre criticidade, use somente campos de negocio: nivel de risco, quantidade de requisicoes, usuario, horario e acesso fora do horario.
-Se todos os registros tiverem nivel de risco normal e indicarem que nao houve acesso fora do horario normal, conclua que nao ha alerta critico no contexto.
-Nao use recomendacoes genericas quando elas nao forem pedidas. Evite ingles, listas longas, texto repetitivo e conclusoes alarmistas.
-Nao diga que medidas, alarmes ou acoes de emergencia sao necessarias ou desnecessarias, a menos que a pergunta solicite recomendacoes.
-Formato obrigatorio:
-Conclusao: responda diretamente em uma frase curta.
-Evidencias: resuma os principais valores observados em uma frase curta.
-Nao escreva outros campos alem de Conclusao e Evidencias.
-""".strip()
+def gerar_resposta_rag(pergunta, contexto):
+    # IR BUSCAR O PROMPT DIRETAMENTE AO POSTGRES
+    system_prompt = get_active_prompt("helpdesk_rag")
+    
+    # O seu código existente do Ollama
+    resposta_ollama = ollama.chat(
+        model='llama3', # ou o modelo que estiver a usar
+        messages=[
+            {'role': 'system', 'content': system_prompt},
+            {'role': 'user', 'content': f"Contexto: {contexto}\n\nPergunta: {pergunta}"}
+        ]
+    )
 
 
 def _model_names(model_list_response: Any) -> set:
