@@ -108,6 +108,7 @@ services:
         sleep 2;
       done;
       ollama pull nomic-embed-text;
+      ollama pull llama2;
       exit 0;
       "
 

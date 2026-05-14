@@ -16,6 +16,7 @@ help:
 	@echo "  ml-train           - Executa o treinamento de modelos no MLflow"
 	@echo "  rag-embeddings     - Gera e insere os embeddings no Milvus"
 	@echo "  pipeline-full      - Executa o fluxo completo (Bronze até Embeddings)"
+	@echo "  audit-logs         - Mostra os logs de auditoria"
 	@echo "  clean              - Remove ficheiros temporários e pastas de cache"
 
 # --- INFRAESTRUTURA ---
@@ -48,6 +49,10 @@ rag-embeddings:
 # --- AUTOMAÇÃO COMPLETA ---
 pipeline-full: data-bronze data-silver data-gold ml-train rag-embeddings
 	@echo "✅ Fluxo completo finalizado com sucesso!"
+
+# audit logs
+audit-logs:
+	docker exec -it mlflow-postgres psql -U mlflow -d mlflow -c "SELECT * FROM rag_audit_logs;
 
 clean:
 	rm -rf __pycache__ .pytest_cache

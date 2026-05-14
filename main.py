@@ -2,6 +2,8 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 import os
+import psycopg2
+from datetime import datetime
 
 # Importando a lógica da Sprint 6
 from rag_milvus_query import embed_text, search_milvus, build_context, ask_ollama
@@ -28,6 +30,40 @@ class QueryResponse(BaseModel):
     answer: str
     sources: List[SourceMetadata]
 
+def log_interaction_to_postgres(question: str, answer: str):
+    """Guarda o histórico do RAG na base de dados para auditoria."""
+    try:
+        conn = psycopg2.connect(
+            dbname="mlflow",
+            user="mlflow",
+            password="mlflow",
+            host="postgres", # Nome do serviço no docker-compose
+            port="5432"
+        )
+        cur = conn.cursor()
+        
+        # Cria a tabela se não existir
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS rag_audit_logs (
+                id SERIAL PRIMARY KEY,
+                timestamp TIMESTAMP,
+                question TEXT,
+                answer TEXT
+            )
+        """)
+        
+        # Insere o registo
+        cur.execute(
+            "INSERT INTO rag_audit_logs (timestamp, question, answer) VALUES (%s, %s, %s)",
+            (datetime.now(), question, answer)
+        )
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print(f"Erro ao auditar no Postgres: {e}")
+
 @app.get("/")
 async def root():
     return {"message": "GenAcademy API está online. Acesse /docs para a documentação Swagger."}
@@ -49,6 +85,8 @@ async def run_rag_query(request: QueryRequest):
         prompt = build_context(request.question, hits)
         answer = ask_ollama(prompt)
 
+        log_interaction_to_postgres(request.question, answer)
+
         # 3. Formatar Resposta
         return QueryResponse(
             question=request.question,
@@ -57,7 +95,7 @@ async def run_rag_query(request: QueryRequest):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
+    
 @app.get("/metadata")
 async def get_metadata():
     """

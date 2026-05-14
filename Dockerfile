@@ -21,7 +21,8 @@ RUN pip install --default-timeout=1000 --no-cache-dir \
     sentence-transformers \
     fastapi \
     uvicorn \
-    pydantic
+    pydantic \
+    psycopg2
 
 # Expõe a porta do painel
 EXPOSE 3000
