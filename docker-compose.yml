@@ -146,6 +146,26 @@ services:
     networks:
       - mlflow-network
 
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: genacademy-api
+    depends_on:
+      - milvus-standalone
+      - ollama
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - MILVUS_HOST=milvus-standalone
+      - BUCKET_NAME=data-lake
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - mlflow-network
+
 networks:
   mlflow-network:
     driver: bridge
