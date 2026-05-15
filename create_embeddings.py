@@ -7,17 +7,17 @@ from ollama import ResponseError
 from pymilvus import connections, FieldSchema, CollectionSchema, DataType, Collection, utility
 
 # ── Configurações ────────────────────────────────────────────
-S3_ENDPOINT_URL = "http://minio:9000" 
-AWS_ACCESS_KEY_ID = "minio"
-AWS_SECRET_ACCESS_KEY = "minio123"
-BUCKET_NAME = "data-lake"
+S3_ENDPOINT_URL = "http://${MINIO_ADDRESS}" 
+AWS_ACCESS_KEY_ID = "${MINIO_ROOT_USER}"
+AWS_SECRET_ACCESS_KEY = "${MINIO_ROOT_PASSWORD}"
+BUCKET_NAME = "${BUCKET_NAME}"
 
-MILVUS_HOST = "milvus-standalone" 
+MILVUS_HOST = "${MILVUS_HOST}" 
 MILVUS_PORT = "19530"
 COLLECTION_NAME = "GenAcademy_Gold_Data"
 EMBEDDING_DIM = 768
 
-OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://ollama:11434")
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "${OLLAMA_HOST}")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
 
 ollama_client = Client(host=OLLAMA_HOST)

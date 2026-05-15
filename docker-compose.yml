@@ -13,9 +13,9 @@ services:
     image: postgres:13
     container_name: mlflow-postgres
     environment:
-      - POSTGRES_USER=mlflow
-      - POSTGRES_PASSWORD=mlflow
-      - POSTGRES_DB=mlflow
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
@@ -27,8 +27,8 @@ services:
     image: minio/minio:latest
     container_name: mlflow-minio
     environment:
-      - MINIO_ROOT_USER=minio
-      - MINIO_ROOT_PASSWORD=minio123
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -47,13 +47,13 @@ services:
       - mlflow-network
     entrypoint: >
       /bin/sh -c "
-      until /usr/bin/mc alias set myminio http://minio:9000 minio minio123; do
+      until /usr/bin/mc alias set myminio http://${MINIO_ADDRESS} ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}; do
         echo 'Aguardando MinIO subir...';
         sleep 2;
       done;
-      /usr/bin/mc mb myminio/data-lake --ignore-existing;
+      /usr/bin/mc mb myminio/${BUCKET_NAME} --ignore-existing;
       /usr/bin/mc mb myminio/mlflow --ignore-existing;
-      /usr/bin/mc version enable myminio/data-lake;
+      /usr/bin/mc version enable myminio/${BUCKET_NAME};
       /usr/bin/mc version enable myminio/mlflow;
       exit 0;
       "
@@ -72,11 +72,11 @@ services:
     volumes:
       - .:/app
     environment:
-      - MLFLOW_S3_ENDPOINT_URL=http://minio:9000
-      - AWS_ACCESS_KEY_ID=minio
-      - AWS_SECRET_ACCESS_KEY=minio123
-      - MLFLOW_TRACKING_URI=postgresql://mlflow:mlflow@postgres:5432/mlflow
-      - BUCKET_NAME=data-lake
+      - MLFLOW_S3_ENDPOINT_URL=http://${MINIO_ADDRESS}
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+      - MLFLOW_TRACKING_URI=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - BUCKET_NAME=${BUCKET_NAME}
     networks:
       - mlflow-network
   # Servidor de LLM local
@@ -98,7 +98,7 @@ services:
     depends_on:
       - ollama
     environment:
-      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_HOST=${OLLAMA_HOST}
     networks:
       - mlflow-network
     entrypoint: >
@@ -134,10 +134,10 @@ services:
     command: ["milvus", "run", "standalone"]
     environment:
       ETCD_ENDPOINTS: etcd:2379
-      MINIO_ADDRESS: minio:9000 # Aponta para o seu MinIO existente
-      MINIO_ACCESS_KEY_ID: minio
-      MINIO_SECRET_ACCESS_KEY: minio123
-      MINIO_BUCKET_NAME: milvus-bucket
+      MINIO_ADDRESS: ${MINIO_ADDRESS} # Aponta para o seu MinIO existente
+      MINIO_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      MINIO_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME}
     ports:
       - "19530:19530"
       - "9091:9091"
@@ -149,7 +149,7 @@ services:
 
   api:
     build:
-      context: .
+      context: ./api
       dockerfile: Dockerfile
     container_name: genacademy-api
     depends_on:
@@ -158,12 +158,11 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - .:/app
+      - ./api:/app
     environment:
-      - OLLAMA_HOST=http://ollama:11434
-      - MILVUS_HOST=milvus-standalone
-      - BUCKET_NAME=data-lake
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+      - OLLAMA_HOST=${OLLAMA_HOST}
+      - MILVUS_HOST=${MILVUS_HOST}
+      - BUCKET_NAME=${BUCKET_NAME}
     networks:
       - mlflow-network
 
