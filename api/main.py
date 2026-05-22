@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 import os
+import time
 import psycopg2
 from datetime import datetime
 
@@ -11,7 +12,8 @@ from rag_milvus_query import embed_text, search_milvus, build_context, ask_ollam
 app = FastAPI(
     title="GenAcademy RAG API",
     description="API para consulta inteligente de logs de infraestrutura usando RAG.",
-    version="1.0.0"
+    version="1.0.0",
+    root_path="/api"
 )
 
 # Modelos de Validação (Input/Output)
@@ -25,10 +27,23 @@ class SourceMetadata(BaseModel):
     score: float
     text: str
 
+class PipelineMetadata(BaseModel):
+    llm_model: str
+    embedding_model: str
+    vector_collection: str
+    inference_time_seconds: float
+    total_tokens_used: int
+
 class QueryResponse(BaseModel):
     question: str
     answer: str
     sources: List[SourceMetadata]
+    pipeline_performance: PipelineMetadata
+
+class ModelInfoResponse(BaseModel):
+    llm_model: str
+    embedding_model: str
+    status: str
 
 def log_interaction_to_postgres(question: str, answer: str):
     """Guarda o histórico do RAG na base de dados para auditoria."""
@@ -70,10 +85,10 @@ async def root():
 
 @app.post("/query", response_model=QueryResponse)
 async def run_rag_query(request: QueryRequest):
-    """
-    Endpoint principal: Recebe uma pergunta, consulta o Milvus e gera resposta via Ollama.
-    """
     try:
+        # Inicia a cronometragem total da requisição (opcional, para incluir busca vetorial)
+        start_time = time.perf_counter()
+
         # 1. Gerar Embedding e Buscar no Milvus
         query_vector = embed_text(request.question)
         hits = search_milvus(query_vector, top_k=request.top_k)
@@ -81,17 +96,29 @@ async def run_rag_query(request: QueryRequest):
         if not hits:
             raise HTTPException(status_code=404, detail="Nenhum contexto encontrado para esta pergunta.")
 
-        # 2. Construir Contexto e Chamar o LLM
+        # 2. Construir Contexto e Chamar o LLM (Recebe agora um dicionário de performance)
         prompt = build_context(request.question, hits)
-        answer = ask_ollama(prompt)
+        llm_result = ask_ollama(prompt)
 
-        log_interaction_to_postgres(request.question, answer)
+        # Tempo total medido pela API (inclui Milvus + Ollama)
+        total_inference_time = time.perf_counter() - start_time
 
-        # 3. Formatar Resposta
+        # 3. Guardar no PostgreSQL (Auditoria)
+        log_interaction_to_postgres(request.question, llm_result["answer"])
+
+        # 4. Formatar a Resposta com os metadados exigidos
         return QueryResponse(
             question=request.question,
-            answer=answer,
-            sources=hits
+            answer=llm_result["answer"],
+            sources=hits,
+            pipeline_performance=PipelineMetadata(
+                llm_model=os.getenv("LLM_MODEL", "llama2"),
+                embedding_model=os.getenv("EMBEDDING_MODEL", "nomic-embed-text"),
+                # Recupera dinamicamente a coleção definida ou usa a padrão do projeto
+                vector_collection=os.getenv("MILVUS_COLLECTION", "aws_logs_gold"),
+                inference_time_seconds=round(total_inference_time, 3),
+                total_tokens_used=llm_result["tokens_used"]
+            )
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -107,3 +134,21 @@ async def get_metadata():
         "vector_db": "Milvus (standalone)",
         "status": "ready"
     }
+
+@app.get("/model", response_model=ModelInfoResponse)
+async def get_active_model():
+    """
+    Retorna os modelos de Inteligência Artificial atualmente ativos na aplicação.
+    """
+    try:
+        # Recupera as variáveis configuradas ou assume os fallbacks do projeto
+        llm = os.getenv("LLM_MODEL", "llama2")
+        embedding = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
+        
+        return ModelInfoResponse(
+            llm_model=llm,
+            embedding_model=embedding,
+            status="active"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao recuperar modelos: {str(e)}")

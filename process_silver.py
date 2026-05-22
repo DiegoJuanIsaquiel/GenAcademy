@@ -3,6 +3,7 @@ import pandas as pd
 import io
 import hashlib
 from datetime import datetime
+import sys
 
 
 # Configuração de conexão com o MinIO
@@ -172,7 +173,7 @@ def process_bronze_to_silver():
         df = pd.read_csv(response["Body"])
     except Exception as e:
         print(f"Erro ao buscar o arquivo na Bronze. Verifique se a ingestão rodou hoje. Detalhes: {e}")
-        return
+        sys.exit(1)
 
     linhas_originais = len(df)
 

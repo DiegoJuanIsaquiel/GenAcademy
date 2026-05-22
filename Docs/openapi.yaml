@@ -1,0 +1,153 @@
+openapi: 3.0.0
+info:
+  title: GenAcademy RAG API
+  description: API para consulta inteligente de logs de infraestrutura usando RAG com telemetria e auditoria relacional.
+  version: 1.1.0
+paths:
+  /:
+    get:
+      summary: Rota Raiz
+      description: Verifica se o serviço está online e operacional.
+      responses:
+        '200':
+          description: Resposta bem-sucedida.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "GenAcademy API está online. Acesse /docs para a documentação Swagger."
+
+  /query:
+    post:
+      summary: Executar Consulta RAG
+      description: Recebe uma pergunta sobre os logs, recupera o contexto no Milvus, infere a resposta via Ollama (Llama2) e audita a transação no PostgreSQL.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryRequest'
+      responses:
+        '200':
+          description: Resposta analítica gerada com sucesso acompanhada da telemetria.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResponse'
+        '404':
+          description: Nenhum contexto vetorial relevante foi encontrado para a pergunta.
+        '500':
+          description: Erro interno no pipeline de processamento (Milvus, Ollama ou Postgres).
+
+  /metadata:
+    get:
+      summary: Recuperar Metadados Gerais
+      description: Retorna informações sobre o estado operacional e os componentes estáticos da aplicação.
+      responses:
+        '200':
+          description: Objeto de metadados recuperado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  embedding_model:
+                    type: string
+                  llm_model:
+                    type: string
+                  vector_db:
+                    type: string
+                  status:
+                    type: string
+
+  /model:
+    get:
+      summary: Recuperar Modelos de IA Ativos
+      description: Endpoint isolado de governança para expor quais os modelos de IA estão a processar as requisições.
+      responses:
+        '200':
+          description: Modelos ativos listados com sucesso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelInfoResponse'
+
+components:
+  schemas:
+    QueryRequest:
+      type: object
+      required:
+        - question
+      properties:
+        question:
+          type: string
+          description: A pergunta do utilizador baseada nos logs de infraestrutura.
+          example: "Houve algum alerta de segurança crítico?"
+        top_k:
+          type: integer
+          description: Quantidade de documentos semanticamente semelhantes a recuperar.
+          default: 5
+          example: 5
+
+    SourceMetadata:
+      type: object
+      properties:
+        id:
+          type: integer
+        domain:
+          type: string
+          example: "security"
+        score:
+          type: float
+          example: 0.412
+        text:
+          type: string
+
+    PipelineMetadata:
+      type: object
+      properties:
+        llm_model:
+          type: string
+          example: "llama2"
+        embedding_model:
+          type: string
+          example: "nomic-embed-text"
+        vector_collection:
+          type: string
+          example: "aws_logs_gold"
+        inference_time_seconds:
+          type: float
+          example: 1.415
+        total_tokens_used:
+          type: integer
+          example: 184
+
+    QueryResponse:
+      type: object
+      properties:
+        question:
+          type: string
+        answer:
+          type: string
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceMetadata'
+        pipeline_performance:
+          $ref: '#/components/schemas/PipelineMetadata'
+
+    ModelInfoResponse:
+      type: object
+      properties:
+        llm_model:
+          type: string
+          example: "llama2"
+        embedding_model:
+          type: string
+          example: "nomic-embed-text"
+        status:
+          type: string
+          example: "active"

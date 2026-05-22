@@ -154,13 +154,13 @@ def normalize_context_text(text: str) -> str:
     return text
 
 
-def ask_ollama(prompt: str) -> str:
+def ask_ollama(prompt: str, system_prompt: str = LLM_SYSTEM_PROMPT) -> dict:
     ensure_ollama_model(LLM_MODEL)
     try:
         response = ollama_client.generate(
             model=LLM_MODEL,
             prompt=prompt,
-            system=LLM_SYSTEM_PROMPT,
+            system=system_prompt,
             options={
                 "temperature": 0.7,
                 "top_p": 0.8,
@@ -169,15 +169,25 @@ def ask_ollama(prompt: str) -> str:
                 "num_ctx": 4096
             },
         )
-    except Exception as exc:
-        raise RuntimeError(f"Erro ao chamar Ollama LLM: {exc}")
+                
+        # O Ollama retorna 'total_duration' em nanossegundos. Convertemos para segundos.
+        duration_seconds = response.get("total_duration", 0) / 1e9
+        
+        # Recupera a contagem de tokens de entrada (prompt) e saída (eval)
+        prompt_tokens = response.get("prompt_eval_count", 0)
+        completion_tokens = response.get("eval_count", 0)
+        total_tokens = prompt_tokens + completion_tokens
 
-    if isinstance(response, dict):
-        return clean_llm_answer(response.get("response") or response.get("text") or str(response))
-    generated_text = getattr(response, "response", None) or getattr(response, "text", None)
-    if generated_text:
-        return clean_llm_answer(generated_text)
-    return clean_llm_answer(str(response))
+        return {
+            "answer": response.get("response", ""),
+            "inference_time": round(duration_seconds, 3),
+            "tokens_used": total_tokens,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens
+        }
+    except Exception as e:
+        print(f"Erro ao chamar Ollama: {e}")
+        raise e
 
 
 def clean_llm_answer(answer: str) -> str:

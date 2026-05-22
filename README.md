@@ -56,6 +56,18 @@ O backend atua como **orquestrador central**, sendo responsável por:
 
 ---
 
+
+## 🔌 Contrato da API (RAG)
+
+A API do sistema expõe a documentação completa dos contratos de dados e rotas. Com a infraestrutura ativa, os contratos podem ser consultados em:
+
+- **Interactive Swagger UI:** [http://localhost:4200/api/docs](http://localhost:4200/api/docs)
+- **Alternative ReDoc:** [http://localhost:4200/api/redoc](http://localhost:4200/api/redoc)
+
+O esquema estático em conformidade com o padrão OpenAPI 3.0.0 também encontra-se arquivado em `Docs/openapi.yaml`.
+
+---
+
 # 🗄️ PostgreSQL (Camada Operacional)
 
 Responsável por armazenar dados de **baixa latência e uso operacional**:

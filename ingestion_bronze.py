@@ -3,6 +3,7 @@ import pandas as pd
 import io
 from datetime import datetime
 import os
+import sys
 
 
 # Configuração de conexão com o MinIO
@@ -111,7 +112,7 @@ def ingest_to_bronze():
 
     if not os.path.exists(local_file_path):
         print(f"Erro: Arquivo '{local_file_path}' não encontrado na pasta atual.")
-        return
+        sys.exit(1)
 
     ensure_bucket_exists(bucket_name)
 
