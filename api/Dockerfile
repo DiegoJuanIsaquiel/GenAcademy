@@ -21,7 +21,9 @@ RUN pip install --default-timeout=1000 --no-cache-dir \
     sentence-transformers \
     fastapi \
     uvicorn \
-    pydantic 
+    pydantic \ 
+    pytest \
+    httpx
 
 # Expõe a porta da API
 EXPOSE 8000
