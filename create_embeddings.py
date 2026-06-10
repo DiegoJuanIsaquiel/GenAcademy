@@ -8,8 +8,8 @@ from pymilvus import connections, FieldSchema, CollectionSchema, DataType, Colle
 
 # ── Configurações ────────────────────────────────────────────
 S3_ENDPOINT_URL = os.getenv("MLFLOW_S3_ENDPOINT_URL", "http://minio:9000")
-AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "minio")
-AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "minio123")
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "minioadmin")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "minioadmin")
 BUCKET_NAME = os.getenv("BUCKET_NAME", "data-lake")
 
 MILVUS_HOST = os.getenv("MILVUS_HOST", "milvus-standalone")

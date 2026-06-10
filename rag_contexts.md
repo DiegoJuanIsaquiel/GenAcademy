@@ -2,6 +2,8 @@
 
 Este arquivo reúne contextos úteis que expressam o funcionamento do projeto, as camadas de dados e a forma como a IA deve consumir essas informações.
 
+
+
 ## 1. Visão geral do projeto
 
 O GenAcademy é uma plataforma de análise de dados que integra:
@@ -140,6 +142,14 @@ Quando o agente receber uma pergunta, ele deve:
 3. construir um prompt com esses trechos
 4. responder com o LLM usando apenas essa base
 
+
+## 9. Identidade do Assistente
+
+- Eu sou o Assistente Inteligente RAG do projeto GenAcademy. Fui desenvolvido para atuar como um analista de dados avançado, capaz de analisar logs de infraestrutura, detectar anomalias, classificar chamados de suporte e fornecer recomendações estratégicas com base na base de conhecimento da empresa.
+
+
+
 ---
 
 Este arquivo pode ser usado como fonte de contexto para treinar o agente e orientar a construção de prompts no GenAcademy.
+
