@@ -168,7 +168,7 @@ O Agent utiliza ferramentas (tools):
 
 # 🔍 Vector Database (RAG)
 
-Responsável por armazenar embeddings e permitir:
+Responsável por armazenar documentos de conhecimento e permitir:
 
 * busca semântica
 * recuperação de contexto
@@ -179,6 +179,138 @@ Responsável por armazenar embeddings e permitir:
 ```text
 Gold → Pipeline de Embeddings → VectorDB
 ```
+
+## Implementação disponível
+
+O projeto agora inclui um módulo de RAG:
+
+* `rag_core.py` — implementa o fluxo de recuperação do contexto a partir de documentos Gold existentes
+* `list` — lista documentos disponíveis em `gold/` local e/ou em MinIO
+* `query` — recupera os trechos mais relevantes e monta o prompt
+* `--llm` — opcionalmente envia o contexto para OpenAI e recebe resposta final
+
+### Exemplo de uso
+
+```bash
+python rag_core.py list --source local --local-base gold
+python rag_core.py query "Quais são os maiores riscos de segurança?" --source local --local-base gold --top-k 5
+OPENAI_API_KEY=... python rag_core.py query "O que diz a documentação do gold security?" --source local --local-base gold --llm
+```
+
+### Consulta com RAG + Milvus + LLM
+
+O script `rag_milvus_query.py` permite fazer perguntas em linguagem natural que são respondidas com base no contexto recuperado da base vetorial (Milvus) usando o modelo de embedding `nomic-embed-text` e respondidas pelo LLM local `llama3.2`.
+
+#### Passo a passo para interagir com a LLM
+
+**1. Suba os containers do projeto.**
+
+```bash
+docker compose up --build -d
+```
+
+**2. Confirme que o Ollama está rodando e que o modelo de embedding existe.**
+
+```bash
+docker exec -it ollama ollama list
+```
+
+O modelo `nomic-embed-text` deve aparecer na lista. Se não aparecer, baixe manualmente:
+
+```bash
+docker exec -it ollama ollama pull nomic-embed-text
+```
+
+**3. Gere os dados Gold, caso ainda não tenha feito isso.**
+
+```bash
+docker exec -it mlflow-server python ingestion_bronze.py
+docker exec -it mlflow-server python process_silver.py
+docker exec -it mlflow-server python process_gold.py
+```
+
+**4. Crie a base vetorial no Milvus.**
+
+```bash
+docker exec -it mlflow-server python create_embeddings.py
+```
+
+Esse passo transforma os registros Gold em textos, inclui os Markdown mais recentes de
+documentação das camadas Bronze, Silver e Gold, gera embeddings com Ollama e salva os
+vetores na coleção `GenAcademy_Gold_Data` do Milvus. Os documentos são divididos por
+seções para permitir que a LLM recupere contexto sobre cada etapa da pipeline.
+O arquivo `project_knowledge.md` também é incluído para responder perguntas sobre a
+identidade do assistente, modelos treinados, métricas e pré-processamento.
+
+**5. Teste primeiro a recuperação de contexto, sem chamar a LLM.**
+
+```bash
+docker exec -it mlflow-server python rag_milvus_query.py "Quais alertas de segurança são mais críticos?" --top-k 5
+```
+
+Esse comando mostra os documentos mais parecidos encontrados no Milvus e o prompt que seria enviado para a LLM.
+
+**6. Faça a pergunta usando a LLM.**
+
+```bash
+docker exec -it mlflow-server python rag_milvus_query.py "Explique o maior risco de segurança identificado." --top-k 5 --llm
+```
+
+Com `--llm`, o script recupera contexto no Milvus, monta um prompt e envia para o modelo configurado em `LLM_MODEL`.
+
+#### Exemplos de Consultas
+
+Aqui estão alguns exemplos de perguntas que você pode fazer:
+
+**Com recuperação de contexto apenas (sem LLM):**
+```bash
+docker exec -it mlflow-server python rag_milvus_query.py "Quais foram as últimas anomalias captadas e os motivos"
+```
+
+**Com resposta da LLM:**
+```bash
+docker exec -it mlflow-server python rag_milvus_query.py "Quais foram as últimas anomalias captadas e os motivos" --llm
+```
+
+**Com mais documentos para contexto:**
+```bash
+docker exec -it mlflow-server python rag_milvus_query.py "Quais foram as últimas anomalias captadas e os motivos" --top-k 10 --llm
+```
+
+**Outras perguntas de exemplo:**
+```bash
+docker exec -it mlflow-server python rag_milvus_query.py "Quais alertas de segurança são mais críticos?" --llm
+docker exec -it mlflow-server python rag_milvus_query.py "Resuma os riscos de segurança encontrados." --llm
+docker exec -it mlflow-server python rag_milvus_query.py "Qual foi o padrão de acesso mais incomum?" --llm
+docker exec -it mlflow-server python rag_milvus_query.py "Quais usuários têm acessos fora do horário normal?" --llm
+```
+
+**7. Opcionalmente, escolha outro modelo de LLM.**
+
+```bash
+docker exec -it mlflow-server python rag_milvus_query.py "Resuma os riscos de segurança encontrados." --top-k 5 --llm --model qwen3.5:4b
+docker exec -it mlflow-server python rag_milvus_query.py "Resuma os riscos de segurança encontrados." --top-k 5 --llm --model phi4
+```
+
+O chat permite escolher entre o modelo configurado em `LLM_MODEL` e os modelos locais
+definidos em `LLM_MODELS`. Por padrão, estão disponíveis `phi4`, `qwen3.5:4b`,
+`gemma3:4b` e `deepseek-r1:8b`. O `docker compose` baixa `phi4` e o modelo de
+embeddings durante a inicialização; os demais
+modelos são baixados sob demanda na primeira utilização.
+
+Por padrão, o projeto usa `nomic-embed-text` para embeddings e `llama3.2` para respostas em linguagem natural.
+
+#### Argumentos do Script
+
+```bash
+docker exec -it mlflow-server python rag_milvus_query.py <pergunta> [opções]
+```
+
+- `<pergunta>` (obrigatório): A pergunta em linguagem natural
+- `--top-k N` (opcional): Número de documentos a recuperar do Milvus (padrão: 5)
+- `--llm` (opcional): Flag para usar o LLM na resposta (sem ela, apenas recupera contexto)
+
+> Se você quiser usar o Agent completo em produção, esse módulo é o núcleo RAG que entrega o contexto semântico ao modelo.
 
 ---
 
@@ -298,6 +430,14 @@ docker exec -it mlflow-server python process_silver.py
 ```bash 
 docker exec -it mlflow-server python process_gold.py
 ```
+
+> Se você alterar dependências Python ou instalar pacotes novos, reconstrua a imagem antes de rodar.
+>
+> ```bash
+docker compose build mlflow
+docker compose up -d
+```
+
 ## 4. Executar o Pipeline de Machine Learning
 Após os dados estarem consolidados na camada Gold, você pode treinar os modelos.
 

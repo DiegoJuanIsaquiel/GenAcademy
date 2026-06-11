@@ -1,4 +1,14 @@
 services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: genacademy-frontend
+    ports:
+      - "4200:80"
+    networks:
+      - mlflow-network
+
   postgres:
     image: postgres:13
     container_name: mlflow-postgres
@@ -66,7 +76,97 @@ services:
       - AWS_ACCESS_KEY_ID=minio
       - AWS_SECRET_ACCESS_KEY=minio123
       - MLFLOW_TRACKING_URI=postgresql://mlflow:mlflow@postgres:5432/mlflow
-      - BUCKET_NAME=mlflow
+      - BUCKET_NAME=data-lake
+    networks:
+      - mlflow-network
+  # Servidor de LLM local
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: always
+    networks:
+      - mlflow-network
+
+  # Setup dos modelos no Ollama
+  ollama-pull:
+    image: ollama/ollama:latest
+    container_name: ollama-pull
+    depends_on:
+      - ollama
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_MODELS=nomic-embed-text llama3.2 phi4
+    networks:
+      - mlflow-network
+    entrypoint: >
+      /bin/sh -c "
+      until ollama list; do
+        echo 'Aguardando Ollama subir...';
+        sleep 2;
+      done;
+      for model in $${OLLAMA_MODELS}; do
+        ollama pull "$${model}";
+      done;
+      exit 0;
+      "
+
+  # Dependencia do Milvus
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.5
+    container_name: milvus-etcd
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - etcd_data:/etcd
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    networks:
+      - mlflow-network
+
+  # Banco Vetorial
+  milvus-standalone:
+    image: milvusdb/milvus:v2.3.1
+    container_name: milvus-standalone
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000 # Aponta para o seu MinIO existente
+      MINIO_ACCESS_KEY_ID: minio
+      MINIO_SECRET_ACCESS_KEY: minio123
+      MINIO_BUCKET_NAME: milvus-bucket
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    depends_on:
+      - etcd
+      - minio
+    networks:
+      - mlflow-network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: genacademy-api
+    depends_on:
+      - milvus-standalone
+      - ollama
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - LLM_MODELS=phi4,qwen3.5:4b,gemma3:4b,deepseek-r1:8b
+      - MILVUS_HOST=milvus-standalone
+      - BUCKET_NAME=data-lake
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     networks:
       - mlflow-network
 
@@ -75,5 +175,7 @@ networks:
     driver: bridge
 
 volumes:
+  ollama_data:
   postgres_data:
   minio_data:
+  etcd_data:
