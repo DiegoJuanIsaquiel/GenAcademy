@@ -35,14 +35,16 @@ describe('ChatService', () => {
 
     request.flush({
       embedding_model: 'nomic-embed-text',
-      llm_model: 'llama2',
+      llm_model: 'llama3.2',
+      available_llm_models: ['llama3.2', 'phi4', 'qwen3.5:4b', 'gemma3:4b', 'deepseek-r1:8b'],
       vector_db: 'Milvus (standalone)',
       status: 'ready'
     });
 
     expect(responseBody).toEqual({
       embedding_model: 'nomic-embed-text',
-      llm_model: 'llama2',
+      llm_model: 'llama3.2',
+      available_llm_models: ['llama3.2', 'phi4', 'qwen3.5:4b', 'gemma3:4b', 'deepseek-r1:8b'],
       vector_db: 'Milvus (standalone)',
       status: 'ready'
     });
@@ -86,6 +88,18 @@ describe('ChatService', () => {
         }
       ]
     });
+  });
+
+  it('deve enviar o modelo LLM escolhido para /api/query', () => {
+    service.sendQuery('Qual e o risco atual?', 'qwen3.5:4b').subscribe();
+
+    const request = httpMock.expectOne('/api/query');
+    expect(request.request.body).toEqual({
+      question: 'Qual e o risco atual?',
+      llm_model: 'qwen3.5:4b'
+    });
+
+    request.flush({ question: 'Qual e o risco atual?', answer: 'Resposta', sources: [] });
   });
 
   it('deve propagar erro ao buscar metadata', () => {

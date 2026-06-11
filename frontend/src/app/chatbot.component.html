@@ -59,6 +59,17 @@
     </section>
 
     <form class="composer" (ngSubmit)="sendMessage()">
+      <label class="composer-label" for="llm-model">Modelo LLM</label>
+      <select
+        id="llm-model"
+        name="llmModel"
+        [(ngModel)]="selectedLlmModel"
+        [disabled]="isSubmitting || !availableLlmModels.length"
+      >
+        @for (model of availableLlmModels; track model) {
+          <option [value]="model">{{ model }}</option>
+        }
+      </select>
       <label class="composer-label" for="chat-question">Pergunta</label>
       <div class="composer-row">
         <input

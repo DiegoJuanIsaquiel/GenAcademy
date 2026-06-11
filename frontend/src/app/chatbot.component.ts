@@ -22,6 +22,8 @@ export class ChatbotComponent implements OnInit {
   assistantName = 'GenAcademy AI';
   assistantDescription = 'Conectando ao servico de assistencia...';
   assistantDetails = '';
+  availableLlmModels: string[] = [];
+  selectedLlmModel = '';
   messages: ChatMessage[] = [];
 
   ngOnInit(): void {
@@ -50,7 +52,7 @@ export class ChatbotComponent implements OnInit {
     this.draft = '';
     this.isSubmitting = true;
 
-    this.chatService.sendQuery(question)
+    this.chatService.sendQuery(question, this.selectedLlmModel)
       .pipe(finalize(() => {
         this.isSubmitting = false;
       }))
@@ -91,7 +93,9 @@ export class ChatbotComponent implements OnInit {
   }
 
   private applyMetadata(metadata: ChatMetadataResponse): void {
-    this.assistantDescription = `LLM ${metadata.llm_model} com embeddings ${metadata.embedding_model}.`;
+    this.availableLlmModels = metadata.available_llm_models;
+    this.selectedLlmModel = metadata.llm_model;
+    this.assistantDescription = `Escolha uma LLM para conversar. Embeddings: ${metadata.embedding_model}.`;
     this.assistantDetails = `Base vetorial: ${metadata.vector_db}. Status da API: ${metadata.status}.`;
   }
 

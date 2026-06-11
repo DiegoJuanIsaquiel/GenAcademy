@@ -11,6 +11,7 @@ export interface ChatMessage {
 export interface QueryRequest {
   question: string;
   top_k?: number;
+  llm_model?: string;
 }
 
 export interface SourceMetadata {
@@ -29,6 +30,7 @@ export interface QueryResponse {
 export interface ChatMetadataResponse {
   embedding_model: string;
   llm_model: string;
+  available_llm_models: string[];
   vector_db: string;
   status: string;
 }

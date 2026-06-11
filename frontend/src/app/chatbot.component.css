@@ -214,7 +214,8 @@
   gap: 0.65rem;
 }
 
-.composer input {
+.composer input,
+.composer select {
   min-width: 0;
   padding: 0.95rem 1rem;
   border-radius: 1rem;
@@ -225,13 +226,19 @@
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
-.composer input:focus {
+.composer input:focus,
+.composer select:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 0.2rem rgba(110, 231, 255, 0.15);
 }
 
-.composer input:disabled {
+.composer input:disabled,
+.composer select:disabled {
   opacity: 0.72;
+}
+
+.composer select {
+  width: 100%;
 }
 
 .composer button {

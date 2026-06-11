@@ -199,7 +199,7 @@ OPENAI_API_KEY=... python rag_core.py query "O que diz a documentação do gold 
 
 ### Consulta com RAG + Milvus + LLM
 
-O script `rag_milvus_query.py` permite fazer perguntas em linguagem natural que são respondidas com base no contexto recuperado da base vetorial (Milvus) usando o modelo de embedding `nomic-embed-text` e respondidas pelo LLM local `llama2`.
+O script `rag_milvus_query.py` permite fazer perguntas em linguagem natural que são respondidas com base no contexto recuperado da base vetorial (Milvus) usando o modelo de embedding `nomic-embed-text` e respondidas pelo LLM local `llama3.2`.
 
 #### Passo a passo para interagir com a LLM
 
@@ -235,7 +235,12 @@ docker exec -it mlflow-server python process_gold.py
 docker exec -it mlflow-server python create_embeddings.py
 ```
 
-Esse passo transforma os registros Gold em textos, gera embeddings com Ollama e salva os vetores na coleção `GenAcademy_Gold_Data` do Milvus.
+Esse passo transforma os registros Gold em textos, inclui os Markdown mais recentes de
+documentação das camadas Bronze, Silver e Gold, gera embeddings com Ollama e salva os
+vetores na coleção `GenAcademy_Gold_Data` do Milvus. Os documentos são divididos por
+seções para permitir que a LLM recupere contexto sobre cada etapa da pipeline.
+O arquivo `project_knowledge.md` também é incluído para responder perguntas sobre a
+identidade do assistente, modelos treinados, métricas e pré-processamento.
 
 **5. Teste primeiro a recuperação de contexto, sem chamar a LLM.**
 
@@ -283,11 +288,17 @@ docker exec -it mlflow-server python rag_milvus_query.py "Quais usuários têm a
 **7. Opcionalmente, escolha outro modelo de LLM.**
 
 ```bash
-docker exec -it ollama ollama pull llama2
-docker exec -it mlflow-server sh -c "LLM_MODEL=llama2 python rag_milvus_query.py 'Resuma os riscos de segurança encontrados.' --top-k 5 --llm"
+docker exec -it mlflow-server python rag_milvus_query.py "Resuma os riscos de segurança encontrados." --top-k 5 --llm --model qwen3.5:4b
+docker exec -it mlflow-server python rag_milvus_query.py "Resuma os riscos de segurança encontrados." --top-k 5 --llm --model phi4
 ```
 
-Por padrão, o projeto usa `nomic-embed-text` para embeddings e `llama2` para respostas em linguagem natural.
+O chat permite escolher entre o modelo configurado em `LLM_MODEL` e os modelos locais
+definidos em `LLM_MODELS`. Por padrão, estão disponíveis `phi4`, `qwen3.5:4b`,
+`gemma3:4b` e `deepseek-r1:8b`. O `docker compose` baixa `phi4` e o modelo de
+embeddings durante a inicialização; os demais
+modelos são baixados sob demanda na primeira utilização.
+
+Por padrão, o projeto usa `nomic-embed-text` para embeddings e `llama3.2` para respostas em linguagem natural.
 
 #### Argumentos do Script
 

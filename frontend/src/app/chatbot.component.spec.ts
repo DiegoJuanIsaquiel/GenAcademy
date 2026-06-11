@@ -11,7 +11,8 @@ describe('ChatbotComponent', () => {
     chatServiceSpy = jasmine.createSpyObj<ChatService>('ChatService', ['getMetadata', 'sendQuery']);
     chatServiceSpy.getMetadata.and.returnValue(of({
       embedding_model: 'nomic-embed-text',
-      llm_model: 'llama2',
+      llm_model: 'llama3.2',
+      available_llm_models: ['llama3.2', 'phi4', 'qwen3.5:4b', 'gemma3:4b', 'deepseek-r1:8b'],
       vector_db: 'Milvus (standalone)',
       status: 'ready'
     }));
@@ -55,7 +56,8 @@ describe('ChatbotComponent', () => {
     const root = fixture.nativeElement as HTMLElement;
     expect(chatServiceSpy.getMetadata).toHaveBeenCalled();
     expect(root.querySelector('h1')?.textContent).toContain('GenAcademy AI');
-    expect(root.querySelector('.description')?.textContent).toContain('LLM llama2 com embeddings nomic-embed-text.');
+    expect(root.querySelector('.description')?.textContent).toContain('Escolha uma LLM para conversar. Embeddings: nomic-embed-text.');
+    expect(root.querySelectorAll('#llm-model option').length).toBe(5);
     expect(root.querySelector('.details')?.textContent).toContain('Base vetorial: Milvus (standalone).');
   });
 
@@ -72,7 +74,7 @@ describe('ChatbotComponent', () => {
 
     const messages = fixture.nativeElement.querySelectorAll('.message');
 
-    expect(chatServiceSpy.sendQuery).toHaveBeenCalledWith('Como esta a plataforma?');
+    expect(chatServiceSpy.sendQuery).toHaveBeenCalledWith('Como esta a plataforma?', 'llama3.2');
     expect(messages.length).toBe(2);
     expect(messages[0].textContent).toContain('Como esta a plataforma?');
     expect(messages[1].textContent).toContain('Resposta da API');
