@@ -8,27 +8,37 @@ services:
       - "4200:80"
     networks:
       - mlflow-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:4200/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   postgres:
     image: postgres:13
     container_name: mlflow-postgres
     environment:
-      - POSTGRES_USER=mlflow
-      - POSTGRES_PASSWORD=mlflow
-      - POSTGRES_DB=mlflow
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - mlflow-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   minio:
     image: minio/minio:latest
     container_name: mlflow-minio
     environment:
-      - MINIO_ROOT_USER=minio
-      - MINIO_ROOT_PASSWORD=minio123
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -37,23 +47,26 @@ services:
       - minio_data:/data
     networks:
       - mlflow-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   minio-setup:
     image: minio/mc
     container_name: mlflow-minio-setup
     depends_on:
-      - minio
+      minio:
+        condition: service_healthy # Só roda o script depois que o MinIO estiver saudável
     networks:
       - mlflow-network
     entrypoint: >
       /bin/sh -c "
-      until /usr/bin/mc alias set myminio http://minio:9000 minio minio123; do
-        echo 'Aguardando MinIO subir...';
-        sleep 2;
-      done;
-      /usr/bin/mc mb myminio/data-lake --ignore-existing;
+      /usr/bin/mc alias set myminio http://${MINIO_ADDRESS} ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD};
+      /usr/bin/mc mb myminio/${BUCKET_NAME} --ignore-existing;
       /usr/bin/mc mb myminio/mlflow --ignore-existing;
-      /usr/bin/mc version enable myminio/data-lake;
+      /usr/bin/mc version enable myminio/${BUCKET_NAME};
       /usr/bin/mc version enable myminio/mlflow;
       exit 0;
       "
@@ -64,21 +77,31 @@ services:
       dockerfile: Dockerfile
     container_name: mlflow-server
     depends_on:
-      - postgres
-      - minio
-      - minio-setup
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-setup:
+        condition: service_completed_successfully
     ports:
       - "3000:3000"
     volumes:
       - .:/app
     environment:
-      - MLFLOW_S3_ENDPOINT_URL=http://minio:9000
-      - AWS_ACCESS_KEY_ID=minio
-      - AWS_SECRET_ACCESS_KEY=minio123
-      - MLFLOW_TRACKING_URI=postgresql://mlflow:mlflow@postgres:5432/mlflow
-      - BUCKET_NAME=data-lake
+      - MLFLOW_S3_ENDPOINT_URL=http://${MINIO_ADDRESS}
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+      - MLFLOW_TRACKING_URI=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - BUCKET_NAME=${BUCKET_NAME}
     networks:
       - mlflow-network
+    healthcheck:
+      # Como a imagem python-slim pode não ter o curl instalado, usamos a biblioteca nativa do Python
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:3000/')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
   # Servidor de LLM local
   ollama:
     image: ollama/ollama:latest
@@ -90,27 +113,27 @@ services:
     restart: always
     networks:
       - mlflow-network
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # Setup dos modelos no Ollama
+  # Setup do modelo de embeddings no Ollama
   ollama-pull:
     image: ollama/ollama:latest
     container_name: ollama-pull
     depends_on:
-      - ollama
+      ollama:
+        condition: service_healthy
     environment:
-      - OLLAMA_HOST=http://ollama:11434
-      - OLLAMA_MODELS=nomic-embed-text llama3.2 phi4
+      - OLLAMA_HOST=${OLLAMA_HOST}
     networks:
       - mlflow-network
     entrypoint: >
       /bin/sh -c "
-      until ollama list; do
-        echo 'Aguardando Ollama subir...';
-        sleep 2;
-      done;
-      for model in $${OLLAMA_MODELS}; do
-        ollama pull "$${model}";
-      done;
+      ollama pull nomic-embed-text;
+      ollama pull llama2;
       exit 0;
       "
 
@@ -128,6 +151,11 @@ services:
     command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
     networks:
       - mlflow-network
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Banco Vetorial
   milvus-standalone:
@@ -136,39 +164,51 @@ services:
     command: ["milvus", "run", "standalone"]
     environment:
       ETCD_ENDPOINTS: etcd:2379
-      MINIO_ADDRESS: minio:9000 # Aponta para o seu MinIO existente
-      MINIO_ACCESS_KEY_ID: minio
-      MINIO_SECRET_ACCESS_KEY: minio123
-      MINIO_BUCKET_NAME: milvus-bucket
+      MINIO_ADDRESS: ${MINIO_ADDRESS}
+      MINIO_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      MINIO_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME}
     ports:
       - "19530:19530"
       - "9091:9091"
     depends_on:
-      - etcd
-      - minio
+      etcd:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     networks:
       - mlflow-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
   api:
     build:
-      context: .
+      context: ./api
       dockerfile: Dockerfile
     container_name: genacademy-api
     depends_on:
-      - milvus-standalone
-      - ollama
+      milvus-standalone:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
     ports:
       - "8000:8000"
     volumes:
-      - .:/app
+      - ./api:/app
     environment:
-      - OLLAMA_HOST=http://ollama:11434
-      - LLM_MODELS=phi4,qwen3.5:4b,gemma3:4b,deepseek-r1:8b
-      - MILVUS_HOST=milvus-standalone
-      - BUCKET_NAME=data-lake
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+      - OLLAMA_HOST=${OLLAMA_HOST}
+      - MILVUS_HOST=${MILVUS_HOST}
+      - BUCKET_NAME=${BUCKET_NAME}
     networks:
       - mlflow-network
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 networks:
   mlflow-network:

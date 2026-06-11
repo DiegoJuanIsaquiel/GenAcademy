@@ -17,6 +17,11 @@ help:
 	@echo "  rag-embeddings     - Gera e insere os embeddings no Milvus"
 	@echo "  pipeline-full      - Executa o fluxo completo (Bronze até Embeddings)"
 	@echo "  clean              - Remove ficheiros temporários e pastas de cache"
+	@echo "  test-api           - Executa testes unitários da API"
+	@echo "  test-data          - Executa testes de integração e LGPD na camada Silver
+	@echo "  test-ai            - Executa bateria de testes RAG"
+	@echo "  audit-logs         - Consulta os logs de auditoria RAG no PostgreSQL"
+
 
 # --- INFRAESTRUTURA ---
 infra-up:
@@ -48,6 +53,21 @@ rag-embeddings:
 # --- AUTOMAÇÃO COMPLETA ---
 pipeline-full: data-bronze data-silver data-gold ml-train rag-embeddings
 	@echo "✅ Fluxo completo finalizado com sucesso!"
+
+# --- TESTES E AUDITORIA (Sprint 10) ---
+test-api:
+	docker exec -it genacademy-api pytest test_main.py -v
+
+test-data:
+	@echo "Executando testes de integridade e LGPD na camada Silver..."
+	docker exec -it mlflow-server pytest test_silver.py -v -W ignore::DeprecationWarning
+
+test-ai:
+	@echo "🧠 Executando bateria de testes RAG (Recuperação, Contexto e Alucinação)..."
+	docker exec -it genacademy-api pytest test_rag.py -v
+
+audit-logs:
+	docker exec -it mlflow-postgres psql -U mlflow -d mlflow -c "SELECT * FROM rag_audit_logs;"
 
 clean:
 	rm -rf __pycache__ .pytest_cache

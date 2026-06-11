@@ -2,6 +2,9 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 import os
+import time
+import psycopg2
+from datetime import datetime
 
 # Importando a lógica da Sprint 6
 from rag_milvus_query import AVAILABLE_LLM_MODELS, LLM_MODEL, answer_known_project_question, ask_ollama, build_context, embed_text, search_milvus, should_expose_sources
@@ -24,10 +27,56 @@ class SourceMetadata(BaseModel):
     score: float
     text: str
 
+class PipelineMetadata(BaseModel):
+    llm_model: str
+    embedding_model: str
+    vector_collection: str
+    inference_time_seconds: float
+    total_tokens_used: int
+
 class QueryResponse(BaseModel):
     question: str
     answer: str
     sources: List[SourceMetadata]
+
+class ModelInfoResponse(BaseModel):
+    llm_model: str
+    embedding_model: str
+    status: str
+
+def log_interaction_to_postgres(question: str, answer: str):
+    """Guarda o histórico do RAG na base de dados para auditoria."""
+    try:
+        conn = psycopg2.connect(
+            dbname="mlflow",
+            user="mlflow",
+            password="mlflow",
+            host="postgres", # Nome do serviço no docker-compose
+            port="5432"
+        )
+        cur = conn.cursor()
+        
+        # Cria a tabela se não existir
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS rag_audit_logs (
+                id SERIAL PRIMARY KEY,
+                timestamp TIMESTAMP,
+                question TEXT,
+                answer TEXT
+            )
+        """)
+        
+        # Insere o registo
+        cur.execute(
+            "INSERT INTO rag_audit_logs (timestamp, question, answer) VALUES (%s, %s, %s)",
+            (datetime.now(), question, answer)
+        )
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print(f"Erro ao auditar no Postgres: {e}")
 
 @app.get("/")
 async def root():
